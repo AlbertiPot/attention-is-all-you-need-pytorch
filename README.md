@@ -30,16 +30,24 @@ If there is any suggestion or error, feel free to fire an issue to let me know. 
 
 An example of training for the WMT'16 Multimodal Translation task (http://www.statmt.org/wmt16/multimodal-task.html).
 
-### 0) Download the spacy language model.
+### 0) Install spacy and Download the spacy language model.
 ```bash
-# conda install -c conda-forge spacy 
-python -m spacy download en
-python -m spacy download de
+conda install -c conda-forge spacy # install spacy
+```
+```bash
+# python -m spacy download en
+# python -m spacy download de
+```
+Not ok due to network, go to github and download two packages `de_core_news_sm` and `en_core_web_sm`, then install via
+```bash
+pip install de_core_news_sm
+pip install en_core_web_sm
 ```
 
 ### 1) Preprocess the data with torchtext and spacy.
+Modified by GBC because `en` and `de` are not subjected to current spacy language model, changed to `de_core_news_sm` and `en_core_web_sm`. The codes in the `preprocess.py` are changed accordingly
 ```bash
-python preprocess.py -lang_src de -lang_trg en -share_vocab -save_data m30k_deen_shr.pkl
+python preprocess.py -lang_src de_core_news_sm -lang_trg en_core_web_sm -share_vocab -save_data m30k_deen_shr.pkl
 ```
 
 ### 2) Train the model
