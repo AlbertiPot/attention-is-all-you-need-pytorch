@@ -23,7 +23,10 @@ Note that this project is still a work in progress.
 
 If there is any suggestion or error, feel free to fire an issue to let me know. :)
 
+# Preparement
+Modified by GBC:
 
+install according to `requirements.txt`. Especially notice the `torchtext 0.8` is required, thus it requires `pytorch 1.7`
 # Usage
 
 ## WMT'16 Multimodal Translation: de-en
@@ -31,6 +34,7 @@ If there is any suggestion or error, feel free to fire an issue to let me know. 
 An example of training for the WMT'16 Multimodal Translation task (http://www.statmt.org/wmt16/multimodal-task.html).
 
 ### 0) Install spacy and Download the spacy language model.
+Modified by GBC:
 ```bash
 conda install -c conda-forge spacy # install spacy
 ```
@@ -52,7 +56,7 @@ python preprocess.py -lang_src de_core_news_sm -lang_trg en_core_web_sm -share_v
 
 ### 2) Train the model
 ```bash
-python train.py -data_pkl m30k_deen_shr.pkl -log m30k_deen_shr -embs_share_weight -proj_share_weight -label_smoothing -output_dir output -b 256 -warmup 128000 -epoch 400
+train_multi30k_de_en.sh
 ```
 
 ### 3) Test the model
