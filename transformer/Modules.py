@@ -61,3 +61,27 @@ class ScaledDotProductAttention(nn.Module):
         output = torch.matmul(attn, v)                                  # [256, 8, 36, 36]*[256, 8, 36, 64] = [256, 8, 36, 64]
 
         return output, attn
+
+
+def get_pad_mask(seq, pad_idx):
+    return (seq != pad_idx).unsqueeze(-2)
+
+
+def get_subsequent_mask(seq):
+    ''' For masking out the subsequent info. '''
+    sz_b, len_s = seq.size()                                                        # 获得序列大小
+    subsequent_mask = (1 - torch.triu(
+        torch.ones((1, len_s, len_s), device=seq.device), diagonal=1)).bool()       # 对(1,len_s,len_s)矩阵保留上三角阵，diagonal=0表示保留对角线上元素，等于1表示对角线上元素也为0，1减去这个矩阵就是后面序列的mask
+    """
+    tensor([
+        [[ True, False, False,  ..., False, False, False],
+         [ True,  True, False,  ..., False, False, False],
+         [ True,  True,  True,  ..., False, False, False],
+         ...,
+         [ True,  True,  True,  ...,  True, False, False],
+         [ True,  True,  True,  ...,  True,  True, False],
+         [ True,  True,  True,  ...,  True,  True,  True]]
+         ], device='cuda:0')
+         shape = 1,32,32
+    """
+    return subsequent_mask
