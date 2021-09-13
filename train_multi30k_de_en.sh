@@ -2,7 +2,7 @@
 # gpu=0 lr_mul=2 scale_emb_or_prj=prj bash train_multi30k_de_en.sh
 # The better setting is:
 # gpu=0 lr_mul=0.5 scale_emb_or_prj=emb bash train_multi30k_de_en.sh
-gpu=0,1 lr_mul=0.5 scale_emb_or_prj=emb
+gpu=2 lr_mul=0.5 scale_emb_or_prj=emb
 
 CUDA_VISIBLE_DEVICES=${gpu} python train.py \
 -data_pkl m30k_deen_shr.pkl \

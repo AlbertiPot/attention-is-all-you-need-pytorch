@@ -3,9 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from transformer.Layers import EncoderLayer, DecoderLayer
-
-
-__author__ = "Yu-Hsiang Huang"
+from transformer.Modules import PositionalEncoding
 
 
 def get_pad_mask(seq, pad_idx):
@@ -14,36 +12,22 @@ def get_pad_mask(seq, pad_idx):
 
 def get_subsequent_mask(seq):
     ''' For masking out the subsequent info. '''
-    sz_b, len_s = seq.size()
+    sz_b, len_s = seq.size()                                                        # 获得序列大小
     subsequent_mask = (1 - torch.triu(
-        torch.ones((1, len_s, len_s), device=seq.device), diagonal=1)).bool()
+        torch.ones((1, len_s, len_s), device=seq.device), diagonal=1)).bool()       # 对(1,len_s,len_s)矩阵保留上三角阵，diagonal=0表示保留对角线上元素，等于1表示对角线上元素也为0，1减去这个矩阵就是后面序列的mask
+    """
+    tensor([
+        [[ True, False, False,  ..., False, False, False],
+         [ True,  True, False,  ..., False, False, False],
+         [ True,  True,  True,  ..., False, False, False],
+         ...,
+         [ True,  True,  True,  ...,  True, False, False],
+         [ True,  True,  True,  ...,  True,  True, False],
+         [ True,  True,  True,  ...,  True,  True,  True]]
+         ], device='cuda:0')
+         shape = 1,32,32
+    """
     return subsequent_mask
-
-
-class PositionalEncoding(nn.Module):
-
-    def __init__(self, d_hid, n_position=200):
-        super(PositionalEncoding, self).__init__()
-
-        # Not a parameter
-        self.register_buffer('pos_table', self._get_sinusoid_encoding_table(n_position, d_hid))
-
-    def _get_sinusoid_encoding_table(self, n_position, d_hid):
-        ''' Sinusoid position encoding table '''
-        # TODO: make it with torch instead of numpy
-
-        def get_position_angle_vec(position):
-            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
-
-        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
-        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
-        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
-
-        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
-
-    def forward(self, x):
-        return x + self.pos_table[:, :x.size(1)].clone().detach()
-
 
 class Encoder(nn.Module):
     ''' A encoder model with self attention mechanism. '''
@@ -54,10 +38,10 @@ class Encoder(nn.Module):
 
         super().__init__()
 
-        self.src_word_emb = nn.Embedding(n_src_vocab, d_word_vec, padding_idx=pad_idx)
+        self.src_word_emb = nn.Embedding(n_src_vocab, d_word_vec, padding_idx=pad_idx)      # n_src_vocab=9521, d_word_vec=512, padding_idx表明输入的序列的第pad_idx位的嵌入不贡献梯度，即pad_idx位的嵌入训练时不会更新
         self.position_enc = PositionalEncoding(d_word_vec, n_position=n_position)
         self.dropout = nn.Dropout(p=dropout)
-        self.layer_stack = nn.ModuleList([
+        self.layer_stack = nn.ModuleList([                                                  # 堆叠n_layers=6次[多头注意力+前馈层]
             EncoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout)
             for _ in range(n_layers)])
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
@@ -69,11 +53,11 @@ class Encoder(nn.Module):
         enc_slf_attn_list = []
 
         # -- Forward
-        enc_output = self.src_word_emb(src_seq)
+        enc_output = self.src_word_emb(src_seq)                                             # (256,36,512), 36个词，每个词512的编码
         if self.scale_emb:
-            enc_output *= self.d_model ** 0.5
-        enc_output = self.dropout(self.position_enc(enc_output))
-        enc_output = self.layer_norm(enc_output)
+            enc_output *= self.d_model ** 0.5                                               # 对词编码的输出乘上/sqrt(d_model)
+        enc_output = self.dropout(self.position_enc(enc_output))                            # 对缩放后的词编码，加上位置编码，dropout       !!!!!!!!!!这里是不是要加dropout
+        enc_output = self.layer_norm(enc_output)                                            # 层归一化                                  !!!!!!!!!!这里是不是要加层归一化
 
         for enc_layer in self.layer_stack:
             enc_output, enc_slf_attn = enc_layer(enc_output, slf_attn_mask=src_mask)
@@ -97,7 +81,7 @@ class Decoder(nn.Module):
         self.position_enc = PositionalEncoding(d_word_vec, n_position=n_position)
         self.dropout = nn.Dropout(p=dropout)
         self.layer_stack = nn.ModuleList([
-            DecoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout)
+            DecoderLayer(d_model, d_inner, n_head, d_k, d_v, dropout=dropout)               # 堆叠n_layers=6次 [多头注意力w/mask+多头注意力+前向层]
             for _ in range(n_layers)])
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
         self.scale_emb = scale_emb
@@ -111,8 +95,8 @@ class Decoder(nn.Module):
         dec_output = self.trg_word_emb(trg_seq)
         if self.scale_emb:
             dec_output *= self.d_model ** 0.5
-        dec_output = self.dropout(self.position_enc(dec_output))
-        dec_output = self.layer_norm(dec_output)
+        dec_output = self.dropout(self.position_enc(dec_output))                            # ！！！！！！！！！！是否要加dropout
+        dec_output = self.layer_norm(dec_output)                                            # ！！！！！！！！！！是否要加层归一化
 
         for dec_layer in self.layer_stack:
             dec_output, dec_slf_attn, dec_enc_attn = dec_layer(
@@ -150,8 +134,8 @@ class Transformer(nn.Module):
         #   'none': no multiplication
 
         assert scale_emb_or_prj in ['emb', 'prj', 'none']
-        scale_emb = (scale_emb_or_prj == 'emb') if trg_emb_prj_weight_sharing else False
-        self.scale_prj = (scale_emb_or_prj == 'prj') if trg_emb_prj_weight_sharing else False
+        scale_emb = (scale_emb_or_prj == 'emb') if trg_emb_prj_weight_sharing else False            # note: scale_emb不是实例变量，是个暂存的值，用于初始化encoder和decoder
+        self.scale_prj = (scale_emb_or_prj == 'prj') if trg_emb_prj_weight_sharing else False       # scale_prj是个示例变量，用于forward时乘线性层的输出
         self.d_model = d_model
 
         self.encoder = Encoder(
@@ -182,16 +166,27 @@ class Transformer(nn.Module):
 
         if emb_src_trg_weight_sharing:
             self.encoder.src_word_emb.weight = self.decoder.trg_word_emb.weight
+        """
+        trg_word_emb和src_word_emb分别是decoder和encode入口处的nn.embedding
+        trg_word_prj是最后输出的Linear层
+        """
 
 
     def forward(self, src_seq, trg_seq):
+        """
+        src_seq:输入序列,(256,36)
+        src_mask:输入序列的mask,(256,1,36)
+        trg_seq:目标序列，(256,32)
+        trg_mask:目标序列的mask, (256,32,32)
+        """
+        # encoder的mask 可能要考虑矩阵不足7的pad的列
+        src_mask = get_pad_mask(src_seq, self.src_pad_idx)                                      # mask是对输入序列，不等于1（词典中blank对应的）对应的位置为True，等于1的位置是False的矩阵，同时在倒数第二维加一个维度
+        # 目标的mask也要考虑pad掉不满足7的列节点的数据，也可能因为这里的编码已经是提取过的，完全去掉这个mask
+        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)       # 前一个是针对空格的mask(256,1,32), 后一个是针对后面序列的mask(1,32,32), 两个求与,得到目标序列的mask(256,32,32)
 
-        src_mask = get_pad_mask(src_seq, self.src_pad_idx)
-        trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
-
-        enc_output, *_ = self.encoder(src_seq, src_mask)
-        dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)
-        seq_logit = self.trg_word_prj(dec_output)
+        enc_output, *_ = self.encoder(src_seq, src_mask)                                        # enc_output(256,36,512)
+        dec_output, *_ = self.decoder(trg_seq, trg_mask, enc_output, src_mask)                  # dec_output(256,32,512)
+        seq_logit = self.trg_word_prj(dec_output)                                               # seq_logit(256, 32, 9521), 目标序列32个词汇，每个词对应的字典中词的概率，字典的长度是9521
         if self.scale_prj:
             seq_logit *= self.d_model ** -0.5
 

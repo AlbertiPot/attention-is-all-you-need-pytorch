@@ -107,3 +107,4 @@ Data
 .data/*
 *.pkl
 output
+prediction.txt

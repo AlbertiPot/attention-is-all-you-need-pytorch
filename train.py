@@ -269,10 +269,10 @@ def main():
 
     #========= Loading Dataset =========#
 
-    if all((opt.train_path, opt.val_path)):
+    if all((opt.train_path, opt.val_path)):                                                 # 若是bpe编码过的数据，会分别存在train和val文件夹下，执行此函数
         training_data, validation_data = prepare_dataloaders_from_bpe_files(opt, device)
     elif opt.data_pkl:
-        training_data, validation_data = prepare_dataloaders(opt, device)
+        training_data, validation_data = prepare_dataloaders(opt, device)                   # pkl数据准备dataloaders
     else:
         raise
 
@@ -338,8 +338,7 @@ def prepare_dataloaders_from_bpe_files(opt, device):
 
 def prepare_dataloaders(opt, device):
     batch_size = opt.batch_size
-    data = pickle.load(open(opt.data_pkl, 'rb'))
-
+    data = pickle.load(open(opt.data_pkl, 'rb'))                                            # dict_keys(['settings', 'vocab', 'train', 'valid', 'test'])
     opt.max_token_seq_len = data['settings'].max_len
     opt.src_pad_idx = data['vocab']['src'].vocab.stoi[Constants.PAD_WORD]
     opt.trg_pad_idx = data['vocab']['trg'].vocab.stoi[Constants.PAD_WORD]
